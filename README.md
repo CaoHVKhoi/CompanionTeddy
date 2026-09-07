@@ -12,7 +12,7 @@ Implemented:
 
 - ESP32-S3 Arduino firmware
 - OLED display initialization and status screens
-- BQ27441 battery gauge integration
+- IP5108 PMIC battery monitoring, charging, and boost control
 - BLE service advertising and provisioning writes
 - Persistent storage for Wi-Fi credentials and an access token
 - Wi-Fi station-mode connection
@@ -50,6 +50,7 @@ Not yet implemented:
     ├── battery_manager.cpp
     ├── ble_manager.cpp
     ├── display_manager.cpp
+    ├── ip5108_pmic.cpp
     ├── main.cpp           # Application coordinator
     └── wifi_manager.cpp
 ```
@@ -66,7 +67,8 @@ This directory contains the public interfaces for the firmware modules and the s
 
 - `device_config`: GPIO assignments, UUIDs, display settings, and audio constants.
 - `display_manager`: SSD1306 initialization and status rendering.
-- `battery_manager`: BQ27441 initialization and battery measurements.
+- `battery_manager`: IP5108 initialization and battery measurements.
+- `ip5108_pmic`: IP5108 register access and charging/boost control.
 - `wifi_manager`: Wi-Fi credentials, Preferences storage, connection state, and access token.
 - `ble_manager`: BLE service, provisioning characteristic, status characteristic, and notifications.
 - `audio_manager`: I2S initialization, reusable audio chunk buffer, recording state, tone playback, and voice API streaming hook.
@@ -82,7 +84,6 @@ This file defines the target board, framework, serial monitor speed, and externa
 - `115200` baud serial monitor
 - Adafruit GFX Library
 - Adafruit SSD1306 Library
-- SparkFun BQ27441 library from its official GitHub ZIP archive
 
 ### `.pio/`
 
@@ -98,7 +99,7 @@ The VS Code configuration selects PlatformIO as the C/C++ configuration provider
 }
 ```
 
-This allows IntelliSense to resolve Arduino core headers and PlatformIO library headers such as `Arduino.h`, `I2S.h`, `Adafruit_SSD1306.h`, and `SparkFunBQ27441.h`.
+This allows IntelliSense to resolve Arduino core headers and PlatformIO library headers such as `Arduino.h`, `I2S.h`, and `Adafruit_SSD1306.h`. The IP5108 driver is implemented locally in `include/ip5108_pmic.h` and `src/ip5108_pmic.cpp`.
 
 ### `.gitignore`
 
@@ -117,7 +118,7 @@ The firmware assumes the following external hardware:
 
 - ESP32-S3 development board
 - 128 x 64 SSD1306 OLED display
-- BQ27441 LiPo fuel gauge
+- IP5108 power-management IC with LiPo battery monitoring
 - I2S microphone
 - I2S amplifier or DAC
 - Record button
@@ -134,8 +135,10 @@ The exact electrical behavior depends on the selected microphone, amplifier, dis
 | I2S word select / frame sync | 5 | Shared I2S clock |
 | I2S microphone data | 6 | Input data |
 | I2S amplifier data | 7 | Output data |
-| I2C SDA | 8 | OLED and BQ27441 bus |
-| I2C SCL | 9 | OLED and BQ27441 bus |
+| I2C SDA | 8 | OLED and IP5108 bus |
+| I2C SCL | 9 | OLED and IP5108 bus |
+| IP5108 I2C address | `0x75` | Configurable in `device_config.h` |
+| IP5108 INT | Not connected (`-1`) | Optional L3/INT GPIO; polling is used when not wired |
 | Record button | 14 | Configured with `INPUT_PULLUP` |
 | Action button | 15 | Configured with `INPUT_PULLUP` |
 | OLED I2C address | `0x3C` | SSD1306 address |
@@ -176,20 +179,21 @@ The `drawStatus()` function renders:
 
 The display is initialized through the I2C bus at address `0x3C`.
 
-### Battery Gauge
+### IP5108 PMIC and Battery Monitoring
 
-The firmware uses the SparkFun BQ27441 library through:
+The firmware uses the local `Ip5108Pmic` driver through:
 
 ```cpp
-#include <SparkFunBQ27441.h>
+#include "ip5108_pmic.h"
 ```
 
-The library provides the global `lipo` instance. The firmware reads:
+The driver communicates with the IP5108 at I2C address `0x75` and reads:
 
-- State of charge through `lipo.soc()`
-- Battery voltage through `lipo.voltage()`
+- Battery percentage through `Ip5108Pmic::batteryPercentage()`
+- Battery voltage through `Ip5108Pmic::batteryVoltage()`
+- Charging state through the IP5108 status registers
 
-The battery capacity is currently configured as `1000` through `lipo.setCapacity(1000)`. This value must be changed to match the actual battery capacity before production.
+During initialization, the firmware enables the IP5108 charger and boost output. Set `IP5108_INT_PIN` to the connected L3/INT GPIO in `device_config.h` when the interrupt line is wired; leave it at `-1` to use the default polling behavior.
 
 Battery status is refreshed every five seconds and is also included in BLE status notifications.
 
@@ -292,7 +296,7 @@ This is a prototype protocol. A versioned structured payload should be introduce
 1. Configures both buttons as active-low inputs with internal pull-ups.
 2. Starts the I2C bus on GPIO 8 and GPIO 9.
 3. Initializes the SSD1306 display.
-4. Initializes the BQ27441 gauge.
+4. Initializes the IP5108 PMIC.
 5. Reads the initial battery percentage and voltage.
 6. Configures the I2S output data pin.
 7. Enables duplex I2S operation.
@@ -421,6 +425,7 @@ The firmware is now organized into focused modules:
 include/
 ├── audio_manager.h
 ├── battery_manager.h
+├── ip5108_pmic.h
 ├── ble_manager.h
 ├── device_config.h
 ├── display_manager.h
@@ -429,6 +434,7 @@ include/
 src/
 ├── audio_manager.cpp
 ├── battery_manager.cpp
+├── ip5108_pmic.cpp
 ├── ble_manager.cpp
 ├── display_manager.cpp
 ├── main.cpp
@@ -439,7 +445,8 @@ Recommended ownership:
 
 - `device_config`: GPIO assignments, UUIDs, device constants, limits
 - `display_manager`: OLED initialization and status rendering
-- `battery_manager`: BQ27441 initialization and measurements
+- `battery_manager`: IP5108 initialization and measurements
+- `ip5108_pmic`: IP5108 register access and power control
 - `ble_manager`: BLE service, characteristics, payload validation, status publishing
 - `wifi_manager`: credential loading, connection state, reconnect logic
 - `audio_manager`: I2S initialization, recording, playback, buffer management
@@ -452,7 +459,7 @@ Recommended ownership:
 - Confirm every GPIO against the physical board.
 - Confirm I2S microphone and amplifier wiring.
 - Confirm OLED address and I2C pull-ups.
-- Confirm BQ27441 calibration and battery capacity.
+- Confirm IP5108 register behavior, battery readings, and charger/boost settings.
 - Add serial diagnostics.
 - Test button debounce.
 
