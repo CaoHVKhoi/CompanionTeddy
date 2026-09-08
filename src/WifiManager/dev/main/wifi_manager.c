@@ -10,9 +10,9 @@
 
 static const char *TAG = "WIFI_MANAGER";
 
-#define WIFI_NVS_NAMESPACE  "wifi"
-#define WIFI_NVS_SSID       "ssid"
-#define WIFI_NVS_PASSWORD   "password"
+#define WIFI_NVS_NAMESPACE "wifi"
+#define WIFI_NVS_SSID "ssid"
+#define WIFI_NVS_PASSWORD "password"
 
 static bool s_wifi_connected = false;
 
@@ -21,8 +21,10 @@ static void wifi_event_handler(void *arg,
                                int32_t event_id,
                                void *event_data)
 {
-    if (event_base == WIFI_EVENT) {
-        switch (event_id) {
+    if (event_base == WIFI_EVENT)
+    {
+        switch (event_id)
+        {
 
         case WIFI_EVENT_AP_START:
             ESP_LOGI(TAG, "SoftAP started");
@@ -55,17 +57,16 @@ static void wifi_event_handler(void *arg,
             break;
         }
     }
-    else if (event_base == IP_EVENT &&
-             event_id == IP_EVENT_STA_GOT_IP) {
-
-        ip_event_got_ip_t *event =
-            (ip_event_got_ip_t *)event_data;
+    else if ((event_base == IP_EVENT) && (event_id == IP_EVENT_STA_GOT_IP))
+    {
+        ip_event_got_ip_t *event =(ip_event_got_ip_t *)event_data;
 
         s_wifi_connected = true;
 
-        ESP_LOGI(TAG,
-                 "STA got IP: " IPSTR,
-                 IP2STR(&event->ip_info.ip));
+        ESP_LOGI(
+            TAG,
+            "STA got IP: " IPSTR,
+            IP2STR(&event->ip_info.ip));
     }
 }
 
@@ -75,15 +76,15 @@ esp_err_t wifi_manager_init(void)
 
     ret = esp_netif_init();
 
-    if (ret != ESP_OK &&
-        ret != ESP_ERR_INVALID_STATE) {
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
         return ret;
     }
 
     ret = esp_event_loop_create_default();
 
-    if (ret != ESP_OK &&
-        ret != ESP_ERR_INVALID_STATE) {
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
         return ret;
     }
 
@@ -91,8 +92,8 @@ esp_err_t wifi_manager_init(void)
 
     ret = esp_wifi_init(&cfg);
 
-    if (ret != ESP_OK &&
-        ret != ESP_ERR_INVALID_STATE) {
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
         return ret;
     }
 
@@ -115,10 +116,10 @@ esp_err_t wifi_manager_init(void)
 
 esp_err_t wifi_manager_start_provisioning(void)
 {
-    esp_netif_t *ap_netif =
-        esp_netif_create_default_wifi_ap();
+    esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
 
-    if (ap_netif == NULL) {
+    if (ap_netif == NULL)
+    {
         return ESP_FAIL;
     }
 
@@ -130,8 +131,7 @@ esp_err_t wifi_manager_start_provisioning(void)
             .password = WIFI_AP_PASSWORD,
             .max_connection = 4,
             .authmode = WIFI_AUTH_WPA2_PSK,
-        }
-    };
+        }};
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
 
@@ -149,10 +149,10 @@ esp_err_t wifi_manager_start_provisioning(void)
     return ESP_OK;
 }
 
-esp_err_t wifi_manager_save_credentials(const char *ssid,
-                                        const char *password)
+esp_err_t wifi_manager_save_credentials(const char *ssid, const char *password)
 {
-    if (ssid == NULL || password == NULL) {
+    if (ssid == NULL || password == NULL)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -163,7 +163,8 @@ esp_err_t wifi_manager_save_credentials(const char *ssid,
         NVS_READWRITE,
         &handle);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         return ret;
     }
 
@@ -172,20 +173,23 @@ esp_err_t wifi_manager_save_credentials(const char *ssid,
         WIFI_NVS_SSID,
         ssid);
 
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         ret = nvs_set_str(
             handle,
             WIFI_NVS_PASSWORD,
             password);
     }
 
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         ret = nvs_commit(handle);
     }
 
     nvs_close(handle);
 
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         ESP_LOGI(TAG, "Wi-Fi credentials saved");
     }
 
@@ -196,12 +200,10 @@ esp_err_t wifi_manager_clear_credentials(void)
 {
     nvs_handle_t handle;
 
-    esp_err_t ret = nvs_open(
-        WIFI_NVS_NAMESPACE,
-        NVS_READWRITE,
-        &handle);
+    esp_err_t ret = nvs_open(WIFI_NVS_NAMESPACE, NVS_READWRITE, &handle);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         return ret;
     }
 
@@ -223,25 +225,20 @@ static esp_err_t wifi_manager_load_credentials(
 {
     nvs_handle_t handle;
 
-    esp_err_t ret = nvs_open(
-        WIFI_NVS_NAMESPACE,
-        NVS_READONLY,
-        &handle);
+    esp_err_t ret = nvs_open(WIFI_NVS_NAMESPACE, NVS_READONLY, &handle);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         return ret;
     }
 
     size_t required_ssid = ssid_size;
     size_t required_password = password_size;
 
-    ret = nvs_get_str(
-        handle,
-        WIFI_NVS_SSID,
-        ssid,
-        &required_ssid);
+    ret = nvs_get_str(handle, WIFI_NVS_SSID, ssid, &required_ssid);
 
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         ret = nvs_get_str(
             handle,
             WIFI_NVS_PASSWORD,
@@ -254,44 +251,34 @@ static esp_err_t wifi_manager_load_credentials(
     return ret;
 }
 
-esp_err_t wifi_manager_connect_sta(const char *ssid,
-                                   const char *password)
+esp_err_t wifi_manager_connect_sta(const char *ssid, const char *password)
 {
-    if (ssid == NULL || password == NULL) {
+    if (ssid == NULL || password == NULL)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
     wifi_config_t sta_config = {0};
 
-    strncpy(
-        (char *)sta_config.sta.ssid,
-        ssid,
-        sizeof(sta_config.sta.ssid) - 1);
+    strncpy((char *)sta_config.sta.ssid,ssid,sizeof(sta_config.sta.ssid) - 1);
 
     strncpy(
         (char *)sta_config.sta.password,
         password,
         sizeof(sta_config.sta.password) - 1);
 
-    esp_netif_t *sta_netif =
-        esp_netif_create_default_wifi_sta();
+    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
 
-    if (sta_netif == NULL) {
+    if (sta_netif == NULL)
+    {
         return ESP_FAIL;
     }
 
     s_wifi_connected = false;
 
-    ESP_ERROR_CHECK(
-        esp_wifi_set_mode(WIFI_MODE_STA));
-
-    ESP_ERROR_CHECK(
-        esp_wifi_set_config(
-            WIFI_IF_STA,
-            &sta_config));
-
-    ESP_ERROR_CHECK(
-        esp_wifi_start());
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA,&sta_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
 
     return ESP_OK;
 }
@@ -307,17 +294,14 @@ esp_err_t wifi_manager_start(void)
         password,
         sizeof(password));
 
-    if (ret == ESP_OK) {
-        ESP_LOGI(TAG,
-                 "Stored Wi-Fi credentials found");
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(TAG,"Stored Wi-Fi credentials found");
 
-        return wifi_manager_connect_sta(
-            ssid,
-            password);
+        return wifi_manager_connect_sta(ssid,password);
     }
 
-    ESP_LOGI(TAG,
-             "No stored Wi-Fi credentials");
+    ESP_LOGI(TAG,"No stored Wi-Fi credentials");
 
     return wifi_manager_start_provisioning();
 }
